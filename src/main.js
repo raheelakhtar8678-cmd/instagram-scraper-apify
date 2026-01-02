@@ -50,11 +50,13 @@ if (search) {
 }
 
 // Add start URLs to the queue
-for (const url of startUrls) {
-    if (typeof url === 'string') {
-        await requestQueue.addRequest({ url });
+for (const request of startUrls) {
+    if (typeof request === 'string') {
+        await requestQueue.addRequest({ url: request });
     } else {
-        await requestQueue.addRequest(url);
+        // Strip ID if it exists to avoid validation error
+        const { id, ...cleanRequest } = request;
+        await requestQueue.addRequest(cleanRequest);
     }
 }
 
