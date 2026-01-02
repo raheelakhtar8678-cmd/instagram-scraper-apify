@@ -4,5 +4,28 @@
     "title": "Instagram Scraper Pro - Profiles, Posts, Hashtags & Analytics",
     "version": "0.1",
     "dockerfile": "./Dockerfile",
-    "input": "./INPUT_SCHEMA.json"
+    "input": "./INPUT_SCHEMA.json",
+    "storages": {
+        "dataset": {
+            "title": "Scraped Instagram Data",
+            "views": {
+                "dashboard": {
+                    "title": "Premium Dashboard",
+                    "transformation": {
+                        "fields": [
+                            "type",
+                            "username",
+                            "fullName",
+                            "followersCount",
+                            "likesCount",
+                            "scrapedAt"
+                        ]
+                    },
+                    "display": {
+                        "component": "table"
+                    }
+                }
+            }
+        }
+    }
 }
