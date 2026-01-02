@@ -192,6 +192,7 @@ const handleHashtag = async ({ page, log, request, enqueueLinks }) => {
         type: 'hashtag',
         url: request.url,
         ...tagInfo,
+        reportUrl: `https://api.apify.com/v2/key-value-stores/${process.env.APIFY_DEFAULT_KEY_VALUE_STORE_ID}/records/REPORT.html`,
         scrapedAt: new Date().toISOString(),
     });
 };
@@ -216,6 +217,7 @@ const handleLocation = async ({ page, log, request, enqueueLinks }) => {
         type: 'location',
         url: request.url,
         ...locInfo,
+        reportUrl: `https://api.apify.com/v2/key-value-stores/${process.env.APIFY_DEFAULT_KEY_VALUE_STORE_ID}/records/REPORT.html`,
         scrapedAt: new Date().toISOString(),
     });
 };
