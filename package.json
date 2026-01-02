@@ -1,0 +1,24 @@
+{
+	"name": "instagram-scraper-premium",
+	"version": "0.0.1",
+	"type": "module",
+	"description": "Premium Instagram Scraper for Apify. Scrapes profiles, posts, hashtags, and places with a stunning HTML report.",
+	"dependencies": {
+		"apify": "^3.2.0",
+		"crawlee": "^3.11.0",
+		"playwright": "^1.42.0",
+		"cheerio": "^1.0.0-rc.12",
+		"fs-extra": "^11.2.0",
+		"got": "^14.2.0"
+	},
+	"devDependencies": {
+		"@apify/eslint-config": "^0.4.0",
+		"eslint": "^8.50.0"
+	},
+	"scripts": {
+		"start": "node src/main.js",
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"author": "Antigravity",
+	"license": "ISC"
+}

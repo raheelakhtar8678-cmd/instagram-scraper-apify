@@ -1,0 +1,11 @@
+node_modules/
+apify_storage/
+storage/
+.DS_Store
+*.log
+.env
+dist/
+build/
+.next/
+out/
+package-lock.json

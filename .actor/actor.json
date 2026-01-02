@@ -1,0 +1,13 @@
+{
+    "actorSpecification": 1,
+    "name": "instagram-scraper-premium",
+    "title": "Instagram Scraper Pro - Profiles, Posts, Hashtags & Analytics",
+    "version": "0.1",
+    "storages": {
+        "dataset": {
+            "actorSpecification": 1,
+            "title": "Instagram Data"
+        }
+    },
+    "dockerfile": "./Dockerfile"
+}

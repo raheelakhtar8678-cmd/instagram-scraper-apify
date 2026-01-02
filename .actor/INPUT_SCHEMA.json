@@ -1,0 +1,68 @@
+{
+    "title": "Instagram Scraper Pro Input",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "startUrls": {
+            "title": "Start URLs",
+            "type": "array",
+            "description": "List of Instagram URLs to scrape. Supported: Profiles, Posts, Reels, Locations, Hashtags.",
+            "editor": "requestListSources",
+            "prefill": [
+                {
+                    "url": "https://www.instagram.com/apify/"
+                }
+            ]
+        },
+        "search": {
+            "title": "Search Query",
+            "type": "string",
+            "description": "Enter a keyword to search on Instagram (e.g., 'tesla', 'nature'). The scraper will find top profiles/tags related to this.",
+            "editor": "textfield"
+        },
+        "searchLimit": {
+            "title": "Search Limit",
+            "type": "integer",
+            "description": "Number of search results to process.",
+            "default": 5,
+            "minimum": 1
+        },
+        "resultsLimit": {
+            "title": "Max Results",
+            "type": "integer",
+            "description": "Maximum number of items (posts/comments) to scrape per target. 0 for infinite (within platform limits).",
+            "default": 20,
+            "minimum": 0
+        },
+        "scrapeComments": {
+            "title": "Scrape Comments?",
+            "type": "boolean",
+            "description": "If enabled, comments will be scraped for each post.",
+            "default": false
+        },
+        "proxy": {
+            "title": "Proxy Configuration",
+            "type": "object",
+            "description": "Select proxies to be used by your crawler.",
+            "editor": "proxy",
+            "prefill": {
+                "useApifyProxy": true,
+                "apifyProxyGroups": [
+                    "RESIDENTIAL"
+                ]
+            }
+        },
+        "loginCookies": {
+            "title": "Login Cookies",
+            "type": "array",
+            "description": "Optional: Cookies to browse as a logged-in user. Helps with rate limits and private info. Export from your browser using an extension.",
+            "editor": "json"
+        },
+        "enhanceReport": {
+            "title": "Generate Visual Report",
+            "type": "boolean",
+            "description": "If enabled, an HTML report with analytics will be generated.",
+            "default": true
+        }
+    }
+}
