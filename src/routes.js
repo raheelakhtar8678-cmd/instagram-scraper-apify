@@ -5,10 +5,13 @@ export const router = createPlaywrightRouter();
 // Helper to normalize IG numbers (e.g. 1.2k -> 1200)
 const parseIGNumber = (str) => {
     if (!str) return 0;
-    const cleanStr = str.replace(/,/g, '').toLowerCase();
-    if (cleanStr.includes('k')) return parseFloat(cleanStr) * 1000;
-    if (cleanStr.includes('m')) return parseFloat(cleanStr) * 1000000;
-    return parseInt(cleanStr.replace(/[^0-9]/g, '')) || 0;
+    const cleanStr = str.replace(/,/g, '').toLowerCase().trim();
+
+    // Handle "1.2k followers" or "1M likes"
+    const numPart = cleanStr.split(' ')[0];
+    if (numPart.includes('k')) return parseFloat(numPart) * 1000;
+    if (numPart.includes('m')) return parseFloat(numPart) * 1000000;
+    return parseInt(numPart.replace(/[^0-9]/g, '')) || 0;
 };
 
 router.addDefaultHandler(async ({ page, log, request, enqueueLinks }) => {
