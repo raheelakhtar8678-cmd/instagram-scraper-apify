@@ -38,29 +38,27 @@ const crawler = new PlaywrightCrawler({
 });
 
 
-// Prepare Request List
-const requestList = await Actor.openRequestList(null, startUrls);
+// Prepare Request Queue
 const requestQueue = await Actor.openRequestQueue();
 
 // Handle Search if provided
 if (search) {
-    const searchUrl = `https://www.instagram.com/explore/tags/${search}/`; // simplified entry
-    // Actually for search implementation we need to search and then enqueue profiles/tags.
-    // For now, let's treat the search term as a hashtag search start.
     await requestQueue.addRequest({
         url: `https://www.instagram.com/explore/tags/${search}/`,
         userData: { label: 'HASHTAG', limit: searchLimit }
     });
 }
 
-// Add start URLs with default labels
-// Logic to detect URL type would go here or inside the router. 
-// For now, we rely on router pattern matching.
+// Add start URLs to the queue
+for (const url of startUrls) {
+    if (typeof url === 'string') {
+        await requestQueue.addRequest({ url });
+    } else {
+        await requestQueue.addRequest(url);
+    }
+}
 
-await crawler.run([
-    ...startUrls,
-    ...(search ? [`https://www.instagram.com/explore/tags/${search}/`] : [])
-]);
+await crawler.run(requestQueue);
 
 // Generate Report
 if (enhanceReport) {
