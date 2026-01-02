@@ -55,17 +55,23 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
         const getHref = (selector) => document.querySelector(selector)?.getAttribute('href');
         const getSrc = (selector) => document.querySelector(selector)?.getAttribute('src');
 
+        // Help finding stats (followers, following, etc)
+        const findStat = (text) => {
+            const el = Array.from(document.querySelectorAll('header ul li, header li span')).find(e => e.innerText.toLowerCase().includes(text));
+            return el?.innerText?.replace(text, '')?.trim();
+        };
+
         return {
-            username: getText('header h2'),
-            fullName: getText('header section > div:nth-child(2) span'),
-            biography: getText('header section > div:nth-child(3) span'),
-            externalUrl: getHref('header section > div:nth-child(3) a'),
+            username: getText('header h2') || getText('h2'),
+            fullName: getText('header section > div:last-child h1') || getText('header section h1') || getText('h1'),
+            biography: Array.from(document.querySelectorAll('header section div')).find(d => d.querySelector('span') && !d.querySelector('h1'))?.innerText?.trim(),
+            externalUrl: getHref('header section a[role="link"][target="_blank"]'),
             profilePic: getSrc('header img'),
-            postsCountRaw: getText('header ul li:nth-child(1) span'),
-            followersCountRaw: getText('header ul li:nth-child(2) span'),
-            followingCountRaw: getText('header ul li:nth-child(3) span'),
-            isPrivate: !!Array.from(document.querySelectorAll('h2')).find(h => h.innerText.includes('This account is private')),
-            isVerified: !!document.querySelector('header h2 svg[aria-label="Verified"]'),
+            postsCountRaw: findStat('posts'),
+            followersCountRaw: findStat('followers'),
+            followingCountRaw: findStat('following'),
+            isPrivate: !!Array.from(document.querySelectorAll('h2')).find(h => h.innerText.toLowerCase().includes('private')),
+            isVerified: !!document.querySelector('header h2 svg[aria-label="Verified"]') || !!document.querySelector('svg[aria-label="Verified"]'),
         };
     });
 
