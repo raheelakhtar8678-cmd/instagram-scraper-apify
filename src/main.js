@@ -38,29 +38,31 @@ const crawler = new PlaywrightCrawler({
 });
 
 
-// Prepare Request Queue
-const requestQueue = await Actor.openRequestQueue();
+// Prepare initial requests
+const requests = [];
 
-// Handle Search if provided
+// Add Search if provided
 if (search) {
-    await requestQueue.addRequest({
+    requests.push({
         url: `https://www.instagram.com/explore/tags/${search}/`,
         userData: { label: 'HASHTAG', limit: searchLimit }
     });
 }
 
-// Add start URLs to the queue
-for (const request of startUrls) {
-    if (typeof request === 'string') {
-        await requestQueue.addRequest({ url: request });
-    } else {
-        // Strip ID if it exists to avoid validation error
-        const { id, ...cleanRequest } = request;
-        await requestQueue.addRequest(cleanRequest);
+// Add start URLs and ensure they are clean
+for (const req of startUrls) {
+    if (typeof req === 'string') {
+        requests.push({ url: req });
+    } else if (req && typeof req === 'object') {
+        // Aggressively strip 'id' and other internal fields that Crawlee's addRequests might reject
+        const { id, ...cleanReq } = req;
+        requests.push(cleanReq);
     }
 }
 
-await crawler.run(requestQueue);
+// Run the crawler with the clean list of requests
+// Crawlee will automatically use the default RequestQueue
+await crawler.run(requests);
 
 // Generate Report
 if (enhanceReport) {
