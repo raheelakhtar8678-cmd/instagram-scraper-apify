@@ -104,17 +104,22 @@ const handlePost = async ({ page, log, request }) => {
     await page.waitForSelector('article', { timeout: 15000 }).catch(() => { });
 
     const postData = await page.evaluate(() => {
-        const getText = (selector) => document.querySelector(selector)?.innerText?.trim();
-
         const article = document.querySelector('article');
-        const caption = article?.querySelector('h1')?.innerText || article?.querySelector('div[role="button"] + div span')?.innerText;
+
+        // Improved caption finding: find the first meaningful span that's not in the header
+        const spans = Array.from(article?.querySelectorAll('span') || []);
+        const captionElement = spans.find(s => s.innerText.trim().length > 5 && !s.closest('header'));
+        const caption = captionElement?.innerText?.trim();
+
         const timestamp = article?.querySelector('time')?.getAttribute('datetime');
-        const images = Array.from(article?.querySelectorAll('img') || []).map(img => img.src).filter(src => !src.includes('profile'));
+        const images = Array.from(article?.querySelectorAll('img') || [])
+            .map(img => img.src)
+            .filter(src => !src.includes('profile') && !src.includes('150x150') && !src.includes('s150x150'));
 
         // Extract comments (first few visible)
-        const comments = Array.from(document.querySelectorAll('ul li:not(:first-child)')).slice(0, 10).map(li => ({
-            user: li.querySelector('h3')?.innerText,
-            text: li.querySelector('span:not([role])')?.innerText,
+        const comments = Array.from(document.querySelectorAll('ul li')).slice(1, 11).map(li => ({
+            user: li.querySelector('h3, a')?.innerText?.trim(),
+            text: li.querySelector('span:not([role])')?.innerText?.trim(),
         })).filter(c => c.user && c.text);
 
         const likesElement = Array.from(document.querySelectorAll('section span')).find(s => s.innerText.includes('likes') || s.innerText.includes('views'));
@@ -124,7 +129,7 @@ const handlePost = async ({ page, log, request }) => {
             timestamp,
             images,
             likesRaw: likesElement?.innerText,
-            owner: document.querySelector('header a')?.innerText,
+            owner: document.querySelector('header a')?.innerText?.trim(),
             comments,
         };
     });

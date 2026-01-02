@@ -79,6 +79,10 @@ await crawler.run(requests);
 // Generate Report
 if (enhanceReport) {
     await generateReport();
+    console.log('----------------------------------------------------------------');
+    console.log('✅ PREMIUM REPORT GENERATED!');
+    console.log(`🔗 View here: https://api.apify.com/v2/key-value-stores/${process.env.APIFY_DEFAULT_KEY_VALUE_STORE_ID}/records/REPORT.html`);
+    console.log('----------------------------------------------------------------');
 }
 
 await Actor.exit();
