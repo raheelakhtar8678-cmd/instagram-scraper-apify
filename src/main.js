@@ -31,11 +31,23 @@ const crawler = new PlaywrightCrawler({
     preNavigationHooks: [
         async ({ page }) => {
             if (loginCookies && Array.isArray(loginCookies) && loginCookies.length > 0) {
-                await page.context().addCookies(loginCookies);
+                const sanitizedCookies = loginCookies.map(cookie => {
+                    const { sameSite, ...rest } = cookie;
+                    const sanitized = { ...rest };
+                    if (sameSite) {
+                        const ss = sameSite.toLowerCase();
+                        if (ss === 'strict') sanitized.sameSite = 'Strict';
+                        else if (ss === 'lax') sanitized.sameSite = 'Lax';
+                        else if (ss === 'none') sanitized.sameSite = 'None';
+                    }
+                    return sanitized;
+                });
+                await page.context().addCookies(sanitizedCookies);
             }
         },
     ],
 });
+
 
 
 // Prepare initial requests
