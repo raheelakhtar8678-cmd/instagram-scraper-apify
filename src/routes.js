@@ -75,31 +75,53 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
         const getHref = (selector) => document.querySelector(selector)?.getAttribute('href');
         const getSrc = (selector) => document.querySelector(selector)?.getAttribute('src');
 
-        // Extract stats from Meta Tag (Ultra Reliable Fallback)
+        // MULTI-LAYERED STATS EXTRACTION
+        let followersRaw = null, followingRaw = null, postsRaw = null;
+
+        // Layer 1: JSON-LD (Search engines see this, very reliable)
+        try {
+            const ldJson = JSON.parse(document.querySelector('script[type="application/ld+json"]')?.innerText || '{}');
+            const interactionStats = ldJson.mainEntityofPage?.interactionStatistic;
+            if (Array.isArray(interactionStats)) {
+                interactionStats.forEach(stat => {
+                    const count = stat.userInteractionCount;
+                    const type = stat.interactionType;
+                    if (type?.includes('FollowAction')) followersRaw = count.toString();
+                    if (type?.includes('WriteAction')) postsRaw = count.toString();
+                });
+            }
+        } catch (e) { }
+
+        // Layer 2: Meta Description
         const metaDesc = document.querySelector('meta[name="description"]')?.getAttribute('content') || '';
-        // Format example: "13.5M Followers, 2,345 Following, 4,567 Posts - See Instagram photos and videos from..."
-        const metaParts = metaDesc.split(' - ')[0].split(',');
+        if (!followersRaw || !postsRaw) {
+            const followersMatch = metaDesc.match(/([\d.,KkMm]+)\s*Followers/i);
+            const followingMatch = metaDesc.match(/([\d.,KkMm]+)\s*Following/i);
+            const postsMatch = metaDesc.match(/([\d.,KkMm]+)\s*Posts/i);
+            if (followersMatch) followersRaw = followersMatch[1];
+            if (followingMatch) followingRaw = followingMatch[1];
+            if (postsMatch) postsRaw = postsMatch[1];
+        }
 
-        const findMetaStat = (label) => {
-            const part = metaParts.find(p => p.toLowerCase().includes(label));
-            return part ? part.trim().split(' ')[0] : null;
-        };
-
-        // Aggressive In-Page stat finding
+        // Layer 3: In-Page Selectors / Fallbacks
         const findStat = (labels) => {
-            const allSpans = Array.from(document.querySelectorAll('span, li, a'));
+            const allSpans = Array.from(document.querySelectorAll('span, li, a, b'));
             for (const label of labels) {
                 const el = allSpans.find(e => e.innerText.toLowerCase().includes(label));
                 if (el) {
                     const text = el.innerText.toLowerCase();
                     const value = text.split(label)[0].trim();
                     if (value && /[\d.,KkMm]/.test(value)) return value;
-                    const numberSpan = el.querySelector('span, b, strong');
-                    if (numberSpan) return numberSpan.innerText.trim();
+                    const childNum = el.querySelector('span, b, strong')?.innerText?.trim();
+                    if (childNum) return childNum;
                 }
             }
             return null;
         };
+
+        if (!followersRaw) followersRaw = findStat(['followers']);
+        if (!followingRaw) followingRaw = findStat(['following']);
+        if (!postsRaw) postsRaw = findStat(['posts']);
 
         // Check for private
         const bodyText = document.body.innerText.toLowerCase();
@@ -112,12 +134,11 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
             biography: Array.from(document.querySelectorAll('header section div, main section div')).find(d => d.innerText.length > 5 && !d.querySelector('h1'))?.innerText?.trim(),
             externalUrl: getHref('header a[role="link"][target="_blank"]') || getHref('main a[role="link"][target="_blank"]'),
             profilePic: getSrc('header img') || getSrc('img[alt*="profile"]'),
-            postsCountRaw: findMetaStat('posts') || findStat(['posts']),
-            followersCountRaw: findMetaStat('followers') || findStat(['followers']),
-            followingCountRaw: findMetaStat('following') || findStat(['following']),
+            postsCountRaw: postsRaw,
+            followersCountRaw: followersRaw,
+            followingCountRaw: followingRaw,
             isPrivate,
             isVerified: !!document.querySelector('svg[aria-label="Verified"]'),
-            descriptionMeta: metaDesc
         };
     }, usernameFromUrl);
 

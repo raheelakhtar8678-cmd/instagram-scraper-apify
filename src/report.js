@@ -137,11 +137,11 @@ export async function generateReport() {
                         </tr>
                     </thead>
                     <tbody>
-                        ${items.slice(0, 15).map(i => `
+                        ${items.filter(i => i.type !== 'SUMMARY').slice(0, 15).map(i => `
                             <tr>
                                 <td style="display:flex; align-items:center; gap:1rem;">
                                     ${i.profilePic ? `<img src="${i.profilePic}" class="profile-pic" onerror="this.src='https://via.placeholder.com/40'">` : ''}
-                                    <span>${i.username || i.tagName || i.locationName || i.url.split('/').pop()}</span>
+                                    <span>${i.username || i.tagName || i.locationName || (i.url ? i.url.split('/').pop() : 'N/A')}</span>
                                 </td>
                                 <td><span style="opacity:0.7">${i.type}</span></td>
                                 <td>${i.followersCount ? i.followersCount.toLocaleString() + ' followers' : (i.likesCount ? i.likesCount.toLocaleString() + ' likes' : '-')}</td>
