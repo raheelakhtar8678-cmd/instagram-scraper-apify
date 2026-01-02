@@ -61,12 +61,12 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
     log.info(`Scraping profile: ${url} (Username: ${usernameFromUrl})`);
 
     // Give the page time to start loading
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(4000);
 
     // "Deep Scraping" - Scroll multiple times to trigger lazy loading
     log.info('Executing deep scroll for post discovery...');
-    for (let i = 0; i < 5; i++) {
-        await page.evaluate(() => window.scrollBy(0, 1200));
+    for (let i = 0; i < 6; i++) {
+        await page.evaluate(() => window.scrollBy(0, 1500));
         await page.waitForTimeout(1000);
     }
 
@@ -78,10 +78,13 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
         // MULTI-LAYERED STATS EXTRACTION
         let followersRaw = null, followingRaw = null, postsRaw = null;
 
-        // Layer 1: JSON-LD (Search engines see this, very reliable)
+        // Layer 1: JSON-LD (Ultra Reliable)
         try {
-            const ldJson = JSON.parse(document.querySelector('script[type="application/ld+json"]')?.innerText || '{}');
-            const interactionStats = ldJson.mainEntityofPage?.interactionStatistic;
+            const ldJson = Array.from(document.querySelectorAll('script[type="application/ld+json"]'))
+                .map(s => JSON.parse(s.innerText || '{}'))
+                .find(j => j.mainEntityofPage);
+
+            const interactionStats = ldJson?.mainEntityofPage?.interactionStatistic;
             if (Array.isArray(interactionStats)) {
                 interactionStats.forEach(stat => {
                     const count = stat.userInteractionCount;
@@ -92,20 +95,30 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
             }
         } catch (e) { }
 
-        // Layer 2: Meta Description
+        // Layer 2: Meta Description Brute Force (Regex)
         const metaDesc = document.querySelector('meta[name="description"]')?.getAttribute('content') || '';
         if (!followersRaw || !postsRaw) {
-            const followersMatch = metaDesc.match(/([\d.,KkMm]+)\s*Followers/i);
-            const followingMatch = metaDesc.match(/([\d.,KkMm]+)\s*Following/i);
-            const postsMatch = metaDesc.match(/([\d.,KkMm]+)\s*Posts/i);
-            if (followersMatch) followersRaw = followersMatch[1];
-            if (followingMatch) followingRaw = followingMatch[1];
-            if (postsMatch) postsRaw = postsMatch[1];
+            // General pattern: [Num] [Word], [Num] [Word]...
+            // Sometimes: 552K Followers, 116 Following, 1,048 Posts
+            // We look for any number followed by a word before a comma/dash
+            const matches = metaDesc.match(/([\d.,KkMm]+)\s*([A-Za-z]+)(?=\s*[,|-])/g);
+            if (matches) {
+                matches.forEach(m => {
+                    const lower = m.toLowerCase();
+                    const val = m.match(/[\d.,KkMm]+/)[0];
+                    if (lower.includes('follower')) followersRaw = val;
+                    if (lower.includes('following')) followingRaw = val;
+                    if (lower.includes('post')) postsRaw = val;
+                });
+            }
+            // Absolute fallback regex
+            if (!followersRaw) followersRaw = metaDesc.match(/([\d.,KkMm]+)\s*Followers/i)?.[1];
+            if (!postsRaw) postsRaw = metaDesc.match(/([\d.,KkMm]+)\s*Posts/i)?.[1];
         }
 
-        // Layer 3: In-Page Selectors / Fallbacks
+        // Layer 3: In-Page Selectors
         const findStat = (labels) => {
-            const allSpans = Array.from(document.querySelectorAll('span, li, a, b'));
+            const allSpans = Array.from(document.querySelectorAll('span, li, a, b, strong'));
             for (const label of labels) {
                 const el = allSpans.find(e => e.innerText.toLowerCase().includes(label));
                 if (el) {
@@ -151,11 +164,24 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
 
     if (!data.isPrivate) {
         log.info('Enqueuing posts for deep scraping...');
-        await enqueueLinks({
+        // Standard enqueuing
+        const { enqueued } = await enqueueLinks({
             selector: 'a[href*="/p/"], a[href*="/reels/"]',
             label: 'POST',
             limit: 30,
         });
+
+        // Brute force link discovery fallback
+        if (enqueued === 0) {
+            log.warning('Standard enqueuing found 0 posts. Attempting brute-force link discovery...');
+            const manualLinks = await page.$$eval('a[href*="/p/"], a[href*="/reels/"]', (els) => els.map(a => a.href));
+            log.info(`Found ${manualLinks.length} posts via brute-force. Adding to queue...`);
+            for (const link of manualLinks.slice(0, 30)) {
+                await Dataset.openRequestQueue().then(q => q.addRequest({ url: link, userData: { label: 'POST' } }));
+            }
+        } else {
+            log.info(`Successfully enqueued ${enqueued} posts.`);
+        }
     }
 
     await Dataset.pushData({

@@ -1,5 +1,5 @@
 import { Actor } from 'apify';
-import { PlaywrightCrawler, ProxyConfiguration } from 'crawlee';
+import { PlaywrightCrawler, ProxyConfiguration, Dataset } from 'crawlee';
 import { router } from './routes.js';
 import { generateReport } from './report.js';
 
@@ -62,7 +62,7 @@ if (search) {
 }
 
 // Push a "Direct Link" item to the dataset so it appears first in the Output tab
-await Actor.pushData({
+await Dataset.pushData({
     type: 'SUMMARY',
     VIEW_PREMIUM_REPORT: `https://api.apify.com/v2/key-value-stores/${process.env.APIFY_DEFAULT_KEY_VALUE_STORE_ID}/records/REPORT.html`,
     message: '🔗 Click the link above to view your premium visual dashboard!',
@@ -85,23 +85,25 @@ for (const req of startUrls) {
 await crawler.run(requests);
 
 // Analytics & Report Summary
-const dataset = await Actor.openDataset();
-const { itemCount } = await dataset.getInfo();
+const { itemCount } = await Dataset.getInfo();
 console.log(`----------------------------------------------------------------`);
 console.log(`📊 FINAL SYNC COMPLETE: ${itemCount} items scraped.`);
 console.log(`----------------------------------------------------------------`);
 
 if (enhanceReport) {
-    if (itemCount > 0) {
+    // Only generate if we have at least one real item besides the SUMMARY
+    if (itemCount > 1) {
         await generateReport();
         console.log('✅ PREMIUM REPORT GENERATED!');
         console.log(`🔗 View here: https://api.apify.com/v2/key-value-stores/${process.env.APIFY_DEFAULT_KEY_VALUE_STORE_ID}/records/REPORT.html`);
     } else {
-        console.log('⚠️ No items were scraped. Skipping report generation.');
-        console.log('💡 Tip: Try providing login cookies or checking if the profile is private.');
-
-        // Save a "No Data" report so the link at least shows something helpful
-        await Actor.setValue('REPORT', '<h1>No Data Scraped</h1><p>The scraper finished without finding any items. This is usually due to a login wall or a temporary block by Instagram.</p>', { contentType: 'text/html' });
+        console.log('⚠️ No real profile data was scraped. Saving fallback dashboard.');
+        const fallbackHtml = `<html><body style="font-family:sans-serif; padding:40px; text-align:center;">
+            <h1>Dashboard Pending</h1>
+            <p>No profile data has been scraped yet. If this run finished, it means the scraper was likely blocked by Instagram's login wall.</p>
+            <p><strong>Tip:</strong> Try providing Login Cookies in the actor input.</p>
+        </body></html>`;
+        await Actor.setValue('REPORT', fallbackHtml, { contentType: 'text/html' });
     }
 }
 
