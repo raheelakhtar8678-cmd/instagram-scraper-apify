@@ -57,38 +57,43 @@ router.addDefaultHandler(async ({ page, log, request, enqueueLinks }) => {
 
 const handleProfile = async ({ page, log, request, enqueueLinks }) => {
     const url = request.url;
-    log.info(`Scraping profile: ${url}`);
+    const usernameFromUrl = url.split('/').filter(Boolean).pop();
+    log.info(`Scraping profile: ${url} (Username: ${usernameFromUrl})`);
 
-    // Wait for content at least
-    await page.waitForTimeout(2000); // Give it a second to stabilize
+    // Give the page time to start loading
+    await page.waitForTimeout(3000);
 
-    // "Deep Scraping" - Scroll to load more posts
-    log.info('Scrolling to discover more posts...');
-    for (let i = 0; i < 3; i++) {
-        await page.evaluate(() => window.scrollBy(0, 1000));
+    // "Deep Scraping" - Scroll multiple times to trigger lazy loading
+    log.info('Executing deep scroll for post discovery...');
+    for (let i = 0; i < 5; i++) {
+        await page.evaluate(() => window.scrollBy(0, 1200));
         await page.waitForTimeout(1000);
     }
 
-    await page.waitForSelector('header', { timeout: 10000 }).catch(() => {
-        log.warning('Header not found, attempting fallback extraction');
-    });
-
-    const data = await page.evaluate(() => {
+    const data = await page.evaluate((usernameFallback) => {
         const getText = (selector) => document.querySelector(selector)?.innerText?.trim();
         const getHref = (selector) => document.querySelector(selector)?.getAttribute('href');
         const getSrc = (selector) => document.querySelector(selector)?.getAttribute('src');
 
-        // Aggressive stat finding
+        // Extract stats from Meta Tag (Ultra Reliable Fallback)
+        const metaDesc = document.querySelector('meta[name="description"]')?.getAttribute('content') || '';
+        // Format example: "13.5M Followers, 2,345 Following, 4,567 Posts - See Instagram photos and videos from..."
+        const metaParts = metaDesc.split(' - ')[0].split(',');
+
+        const findMetaStat = (label) => {
+            const part = metaParts.find(p => p.toLowerCase().includes(label));
+            return part ? part.trim().split(' ')[0] : null;
+        };
+
+        // Aggressive In-Page stat finding
         const findStat = (labels) => {
             const allSpans = Array.from(document.querySelectorAll('span, li, a'));
             for (const label of labels) {
                 const el = allSpans.find(e => e.innerText.toLowerCase().includes(label));
                 if (el) {
-                    // Try to finding the number which is often in a sibling or parent
                     const text = el.innerText.toLowerCase();
                     const value = text.split(label)[0].trim();
                     if (value && /[\d.,KkMm]/.test(value)) return value;
-                    // Try finding a child span which might have the actual number
                     const numberSpan = el.querySelector('span, b, strong');
                     if (numberSpan) return numberSpan.innerText.trim();
                 }
@@ -102,18 +107,19 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
             !!Array.from(document.querySelectorAll('h2')).find(h => h.innerText.toLowerCase().includes('private'));
 
         return {
-            username: getText('header h2') || getText('h2') || document.title.split(' • ')[0],
+            username: getText('header h2') || getText('h2') || usernameFallback,
             fullName: getText('header section h1') || getText('h1') || getText('header section > div:last-child h1'),
             biography: Array.from(document.querySelectorAll('header section div, main section div')).find(d => d.innerText.length > 5 && !d.querySelector('h1'))?.innerText?.trim(),
             externalUrl: getHref('header a[role="link"][target="_blank"]') || getHref('main a[role="link"][target="_blank"]'),
             profilePic: getSrc('header img') || getSrc('img[alt*="profile"]'),
-            postsCountRaw: findStat(['posts']),
-            followersCountRaw: findStat(['followers']),
-            followingCountRaw: findStat(['following']),
+            postsCountRaw: findMetaStat('posts') || findStat(['posts']),
+            followersCountRaw: findMetaStat('followers') || findStat(['followers']),
+            followingCountRaw: findMetaStat('following') || findStat(['following']),
             isPrivate,
             isVerified: !!document.querySelector('svg[aria-label="Verified"]'),
+            descriptionMeta: metaDesc
         };
-    });
+    }, usernameFromUrl);
 
     // Normalize stats
     data.followersCount = parseIGNumber(data.followersCountRaw);
@@ -123,8 +129,9 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
     log.info(`Extracted profile ${data.username}: ${data.followersCount} followers (Private: ${data.isPrivate})`);
 
     if (!data.isPrivate) {
+        log.info('Enqueuing posts for deep scraping...');
         await enqueueLinks({
-            selector: 'a[href*="/p/"]',
+            selector: 'a[href*="/p/"], a[href*="/reels/"]',
             label: 'POST',
             limit: 30,
         });
@@ -134,7 +141,7 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
         type: 'profile',
         url,
         ...data,
-        reportUrl: `https://api.apify.com/v2/key-value-stores/${process.env.APIFY_DEFAULT_KEY_VALUE_STORE_ID}/records/REPORT.html`,
+        VIEW_PREMIUM_REPORT: `https://api.apify.com/v2/key-value-stores/${process.env.APIFY_DEFAULT_KEY_VALUE_STORE_ID}/records/REPORT.html`,
         scrapedAt: new Date().toISOString(),
     });
 };
