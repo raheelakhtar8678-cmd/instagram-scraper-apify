@@ -48,30 +48,51 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
     const url = request.url;
     log.info(`Scraping profile: ${url}`);
 
-    await page.waitForSelector('header', { timeout: 15000 }).catch(() => { });
+    // Wait for the main content to load
+    await page.waitForLoadState('networkidle');
+    await page.waitForSelector('header', { timeout: 15000 }).catch(() => {
+        log.warning('Header not found, attempting fallback extraction');
+    });
 
     const data = await page.evaluate(() => {
         const getText = (selector) => document.querySelector(selector)?.innerText?.trim();
         const getHref = (selector) => document.querySelector(selector)?.getAttribute('href');
         const getSrc = (selector) => document.querySelector(selector)?.getAttribute('src');
 
-        // Help finding stats (followers, following, etc)
-        const findStat = (text) => {
-            const el = Array.from(document.querySelectorAll('header ul li, header li span')).find(e => e.innerText.toLowerCase().includes(text));
-            return el?.innerText?.replace(text, '')?.trim();
+        // Aggressive stat finding
+        const findStat = (labels) => {
+            const allSpans = Array.from(document.querySelectorAll('span, li, a'));
+            for (const label of labels) {
+                const el = allSpans.find(e => e.innerText.toLowerCase().includes(label));
+                if (el) {
+                    // Try to finding the number which is often in a sibling or parent
+                    const text = el.innerText.toLowerCase();
+                    const value = text.split(label)[0].trim();
+                    if (value && /[\d.,KkMm]/.test(value)) return value;
+                    // Try finding a child span which might have the actual number
+                    const numberSpan = el.querySelector('span, b, strong');
+                    if (numberSpan) return numberSpan.innerText.trim();
+                }
+            }
+            return null;
         };
 
+        // Check for private
+        const bodyText = document.body.innerText.toLowerCase();
+        const isPrivate = bodyText.includes('this account is private') ||
+            !!Array.from(document.querySelectorAll('h2')).find(h => h.innerText.toLowerCase().includes('private'));
+
         return {
-            username: getText('header h2') || getText('h2'),
-            fullName: getText('header section > div:last-child h1') || getText('header section h1') || getText('h1'),
-            biography: Array.from(document.querySelectorAll('header section div')).find(d => d.querySelector('span') && !d.querySelector('h1'))?.innerText?.trim(),
-            externalUrl: getHref('header section a[role="link"][target="_blank"]'),
-            profilePic: getSrc('header img'),
-            postsCountRaw: findStat('posts'),
-            followersCountRaw: findStat('followers'),
-            followingCountRaw: findStat('following'),
-            isPrivate: !!Array.from(document.querySelectorAll('h2')).find(h => h.innerText.toLowerCase().includes('private')),
-            isVerified: !!document.querySelector('header h2 svg[aria-label="Verified"]') || !!document.querySelector('svg[aria-label="Verified"]'),
+            username: getText('header h2') || getText('h2') || document.title.split(' • ')[0],
+            fullName: getText('header section h1') || getText('h1') || getText('header section > div:last-child h1'),
+            biography: Array.from(document.querySelectorAll('header section div, main section div')).find(d => d.innerText.length > 5 && !d.querySelector('h1'))?.innerText?.trim(),
+            externalUrl: getHref('header a[role="link"][target="_blank"]') || getHref('main a[role="link"][target="_blank"]'),
+            profilePic: getSrc('header img') || getSrc('img[alt*="profile"]'),
+            postsCountRaw: findStat(['posts']),
+            followersCountRaw: findStat(['followers']),
+            followingCountRaw: findStat(['following']),
+            isPrivate,
+            isVerified: !!document.querySelector('svg[aria-label="Verified"]'),
         };
     });
 
@@ -80,7 +101,7 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
     data.followingCount = parseIGNumber(data.followingCountRaw);
     data.postsCount = parseIGNumber(data.postsCountRaw);
 
-    log.info(`Extracted profile ${data.username}: ${data.followersCount} followers`);
+    log.info(`Extracted profile ${data.username}: ${data.followersCount} followers (Private: ${data.isPrivate})`);
 
     if (!data.isPrivate) {
         await enqueueLinks({
@@ -94,6 +115,7 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
         type: 'profile',
         url,
         ...data,
+        reportUrl: `https://api.apify.com/v2/key-value-stores/${process.env.APIFY_DEFAULT_KEY_VALUE_STORE_ID}/records/REPORT.html`,
         scrapedAt: new Date().toISOString(),
     });
 };
@@ -140,6 +162,7 @@ const handlePost = async ({ page, log, request }) => {
         type: 'post',
         url: request.url,
         ...postData,
+        reportUrl: `https://api.apify.com/v2/key-value-stores/${process.env.APIFY_DEFAULT_KEY_VALUE_STORE_ID}/records/REPORT.html`,
         scrapedAt: new Date().toISOString(),
     });
 };

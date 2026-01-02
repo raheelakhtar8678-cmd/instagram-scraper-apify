@@ -19,6 +19,8 @@
                             "fullName",
                             "followersCount",
                             "likesCount",
+                            "isPrivate",
+                            "reportUrl",
                             "scrapedAt"
                         ]
                     },
