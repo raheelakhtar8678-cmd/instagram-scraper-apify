@@ -76,13 +76,25 @@ for (const req of startUrls) {
 // Crawlee will automatically use the default RequestQueue
 await crawler.run(requests);
 
-// Generate Report
+// Analytics & Report Summary
+const dataset = await Actor.openDataset();
+const { itemCount } = await dataset.getInfo();
+console.log(`----------------------------------------------------------------`);
+console.log(`📊 FINAL SYNC COMPLETE: ${itemCount} items scraped.`);
+console.log(`----------------------------------------------------------------`);
+
 if (enhanceReport) {
-    await generateReport();
-    console.log('----------------------------------------------------------------');
-    console.log('✅ PREMIUM REPORT GENERATED!');
-    console.log(`🔗 View here: https://api.apify.com/v2/key-value-stores/${process.env.APIFY_DEFAULT_KEY_VALUE_STORE_ID}/records/REPORT.html`);
-    console.log('----------------------------------------------------------------');
+    if (itemCount > 0) {
+        await generateReport();
+        console.log('✅ PREMIUM REPORT GENERATED!');
+        console.log(`🔗 View here: https://api.apify.com/v2/key-value-stores/${process.env.APIFY_DEFAULT_KEY_VALUE_STORE_ID}/records/REPORT.html`);
+    } else {
+        console.log('⚠️ No items were scraped. Skipping report generation.');
+        console.log('💡 Tip: Try providing login cookies or checking if the profile is private.');
+
+        // Save a "No Data" report so the link at least shows something helpful
+        await Actor.setValue('REPORT', '<h1>No Data Scraped</h1><p>The scraper finished without finding any items. This is usually due to a login wall or a temporary block by Instagram.</p>', { contentType: 'text/html' });
+    }
 }
 
 await Actor.exit();

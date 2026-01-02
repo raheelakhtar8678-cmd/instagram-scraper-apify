@@ -14,22 +14,30 @@ const parseIGNumber = (str) => {
 router.addDefaultHandler(async ({ page, log, request, enqueueLinks }) => {
     log.info(`Processing ${request.url}`);
 
-    // Check for login wall or rate limiting
-    const loginWall = await page.$('h2:has-text("Log in to Instagram")');
-    if (loginWall) {
-        log.error('Hit login wall. Suggesting session cookies in input.');
+    // Check for login wall or rate limiting (often shows up as a heading)
+    const isLogin = await page.evaluate(() => {
+        const h2s = Array.from(document.querySelectorAll('h2'));
+        return h2s.some(h => h.innerText.toLowerCase().includes('log in') || h.innerText.toLowerCase().includes('sign up'));
+    });
+
+    if (isLogin) {
+        log.error('Hit login wall. This runner is being blocked. Cookies are highly recommended.');
         throw new Error('LOGIN_REQUIRED');
     }
 
-    // Check for "Something went wrong"
-    const errorText = await page.$('text="Something went wrong"');
-    if (errorText) {
-        log.error('Instagram reported an error. Retrying...');
+    // Check for "Something went wrong" or "Page not available"
+    const isError = await page.evaluate(() => {
+        const text = document.body.innerText.toLowerCase();
+        return text.includes('something went wrong') || text.includes('link you followed may be broken');
+    });
+
+    if (isError) {
+        log.error('Instagram reported an error or page not found. Retrying...');
         throw new Error('INSTAGRAM_ERROR');
     }
 
     // Check for cookie consent
-    const cookieButton = await page.$('button:has-text("Allow all cookies")');
+    const cookieButton = await page.$('button:has-text("Allow all cookies"), button:has-text("Decline optional cookies")');
     if (cookieButton) await cookieButton.click();
 
     // Route based on URL pattern
@@ -48,9 +56,17 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
     const url = request.url;
     log.info(`Scraping profile: ${url}`);
 
-    // Wait for the main content to load
-    await page.waitForLoadState('networkidle');
-    await page.waitForSelector('header', { timeout: 15000 }).catch(() => {
+    // Wait for content at least
+    await page.waitForTimeout(2000); // Give it a second to stabilize
+
+    // "Deep Scraping" - Scroll to load more posts
+    log.info('Scrolling to discover more posts...');
+    for (let i = 0; i < 3; i++) {
+        await page.evaluate(() => window.scrollBy(0, 1000));
+        await page.waitForTimeout(1000);
+    }
+
+    await page.waitForSelector('header', { timeout: 10000 }).catch(() => {
         log.warning('Header not found, attempting fallback extraction');
     });
 
@@ -107,7 +123,7 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
         await enqueueLinks({
             selector: 'a[href*="/p/"]',
             label: 'POST',
-            limit: 15,
+            limit: 30,
         });
     }
 
