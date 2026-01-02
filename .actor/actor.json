@@ -14,13 +14,13 @@
                     "title": "Premium Dashboard",
                     "transformation": {
                         "fields": [
+                            "VIEW_PREMIUM_REPORT",
                             "type",
                             "username",
                             "fullName",
                             "followersCount",
-                            "likesCount",
+                            "postsCount",
                             "isPrivate",
-                            "reportUrl",
                             "scrapedAt"
                         ]
                     },

@@ -61,6 +61,14 @@ if (search) {
     });
 }
 
+// Push a "Direct Link" item to the dataset so it appears first in the Output tab
+await Actor.pushData({
+    type: 'SUMMARY',
+    VIEW_PREMIUM_REPORT: `https://api.apify.com/v2/key-value-stores/${process.env.APIFY_DEFAULT_KEY_VALUE_STORE_ID}/records/REPORT.html`,
+    message: '🔗 Click the link above to view your premium visual dashboard!',
+    scrapedAt: new Date().toISOString(),
+});
+
 // Add start URLs and ensure they are clean
 for (const req of startUrls) {
     if (typeof req === 'string') {
