@@ -64,7 +64,7 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
             postsCountRaw: getText('header ul li:nth-child(1) span'),
             followersCountRaw: getText('header ul li:nth-child(2) span'),
             followingCountRaw: getText('header ul li:nth-child(3) span'),
-            isPrivate: !!document.querySelector('h2:has-text("This account is private")'),
+            isPrivate: !!Array.from(document.querySelectorAll('h2')).find(h => h.innerText.includes('This account is private')),
             isVerified: !!document.querySelector('header h2 svg[aria-label="Verified"]'),
         };
     });
@@ -111,11 +111,13 @@ const handlePost = async ({ page, log, request }) => {
             text: li.querySelector('span:not([role])')?.innerText,
         })).filter(c => c.user && c.text);
 
+        const likesElement = Array.from(document.querySelectorAll('section span')).find(s => s.innerText.includes('likes') || s.innerText.includes('views'));
+
         return {
             caption,
             timestamp,
             images,
-            likesRaw: getText('section:has(span:has-text("likes")) span:has-text("likes")') || getText('section span:has-text("views")'),
+            likesRaw: likesElement?.innerText,
             owner: document.querySelector('header a')?.innerText,
             comments,
         };
@@ -136,10 +138,13 @@ const handleHashtag = async ({ page, log, request, enqueueLinks }) => {
 
     await page.waitForSelector('header h1', { timeout: 15000 }).catch(() => { });
 
-    const tagInfo = await page.evaluate(() => ({
-        tagName: document.querySelector('header h1')?.innerText,
-        postsCountRaw: document.querySelector('header span:has-text("posts")')?.innerText,
-    }));
+    const tagInfo = await page.evaluate(() => {
+        const postsSpan = Array.from(document.querySelectorAll('header span')).find(s => s.innerText.includes('posts'));
+        return {
+            tagName: document.querySelector('header h1')?.innerText,
+            postsCountRaw: postsSpan?.innerText,
+        };
+    });
 
     tagInfo.postsCount = parseIGNumber(tagInfo.postsCountRaw);
 
