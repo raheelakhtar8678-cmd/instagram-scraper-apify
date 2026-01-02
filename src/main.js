@@ -23,7 +23,7 @@ const crawler = new PlaywrightCrawler({
     proxyConfiguration,
     useSessionPool: true,
     persistCookiesPerSession: true,
-    maxConcurrentCrawls: 2, // Instagram is strict
+    maxConcurrency: 2, // Instagram is strict
     requestHandler: router,
     headless: true,
 
