@@ -140,17 +140,24 @@ export async function generateReport() {
                         </tr>
                     </thead>
                     <tbody>
-                        ${items.filter(i => i.type && i.type !== 'SUMMARY').slice(0, 20).map(i => `
-                            <tr>
-                                <td style="display:flex; align-items:center; gap:1rem;">
-                                    ${i.profilePic ? `<img src="${i.profilePic}" class="profile-pic" onerror="this.src='https://via.placeholder.com/40'">` : ''}
-                                    <span>${i.username || i.owner || i.tagName || i.locationName || (i.url ? i.url.split('/').pop() : 'N/A')}</span>
-                                </td>
-                                <td><span style="opacity:0.7">${i.type}</span></td>
-                                <td>${i.followersCount ? i.followersCount.toLocaleString() + ' followers' : (i.likesCount ? i.likesCount.toLocaleString() + ' likes' : '-')}</td>
-                                <td><span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">Scraped</span></td>
-                            </tr>
-                        `).join('')}
+                        ${items.filter(i => i.type && i.type !== 'SUMMARY').slice(0, 20).map(i => {
+        const name = i.username || i.tagName || i.locationName || i.owner || (i.caption ? i.caption.substring(0, 20) + '...' : null) || (i.url ? i.url.split('/').pop() : 'N/A');
+        const metrics = i.followersCount ? i.followersCount.toLocaleString() + ' followers' : (i.likesCount ? i.likesCount.toLocaleString() + ' likes' : '-');
+        return `
+                                <tr>
+                                    <td style="display:flex; align-items:center; gap:1rem;">
+                                        ${i.profilePic || (i.images && i.images[0]) ? `<img src="${i.profilePic || i.images[0]}" class="profile-pic" onerror="this.src='https://via.placeholder.com/40'">` : ''}
+                                        <div style="display:flex; flex-direction:column;">
+                                            <span style="font-weight:600;">${name}</span>
+                                            ${i.caption ? `<span style="font-size:0.7rem; opacity:0.6; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${i.caption}</span>` : ''}
+                                        </div>
+                                    </td>
+                                    <td><span style="opacity:0.7">${i.type}</span></td>
+                                    <td>${metrics}</td>
+                                    <td><span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">Scraped</span></td>
+                                </tr>
+                            `;
+    }).join('')}
                         ${items.length <= 1 ? '<tr><td colspan="4" style="text-align:center; padding:2rem; opacity:0.5;">No data items found yet. Check logs for blocks.</td></tr>' : ''}
                     </tbody>
                 </table>

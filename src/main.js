@@ -130,7 +130,10 @@ if (enhanceReport) {
             scrapedAt: new Date().toISOString(),
         });
 
-        console.log(`🔗 PREMIUM REPORT READY! View here: https://api.apify.com/v2/key-value-stores/${process.env.APIFY_DEFAULT_KEY_VALUE_STORE_ID}/records/REPORT.html`);
+        console.log(`================================================================`);
+        console.log(`🔗 PREMIUM REPORT READY!`);
+        console.log(`👉 View Dashboard: https://api.apify.com/v2/key-value-stores/${process.env.APIFY_DEFAULT_KEY_VALUE_STORE_ID}/records/REPORT.html`);
+        console.log(`================================================================`);
     } else {
         console.log('⚠️ No real profile data was scraped. Saving fallback dashboard.');
         const fallbackHtml = `<html><body style="font-family:sans-serif; padding:40px; text-align:center; background:#0f172a; color:#f8fafc;">

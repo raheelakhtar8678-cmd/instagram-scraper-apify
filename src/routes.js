@@ -268,7 +268,9 @@ const handlePost = async ({ page, log, request }) => {
 
         // Improved caption finding: find the first meaningful span that's not in the header
         const spans = Array.from(article?.querySelectorAll('span') || []);
-        const captionElement = spans.find(s => s.innerText.trim().length > 5 && !s.closest('header'));
+        const captionElement = spans.find(s => s.innerText.trim().length > 5 && !s.closest('header')) ||
+            document.querySelector('h1 + div span') ||
+            document.querySelector('article > div > div > span');
         const caption = captionElement?.innerText?.trim();
 
         const timestamp = article?.querySelector('time')?.getAttribute('datetime');
@@ -282,14 +284,16 @@ const handlePost = async ({ page, log, request }) => {
             text: li.querySelector('span:not([role])')?.innerText?.trim(),
         })).filter(c => c.user && c.text);
 
-        const likesElement = Array.from(document.querySelectorAll('section span')).find(s => s.innerText.includes('likes') || s.innerText.includes('views'));
+        // Mobile likes often hidden or in specific spans
+        const likesElement = Array.from(document.querySelectorAll('section span, div span'))
+            .find(s => s.innerText.includes('likes') || s.innerText.includes('views') || /^\d+ likes$/.test(s.innerText.trim()));
 
         return {
             caption,
             timestamp,
             images,
             likesRaw: likesElement?.innerText,
-            owner: document.querySelector('header a')?.innerText?.trim(),
+            owner: document.querySelector('header a')?.innerText?.trim() || document.querySelector('h2 a')?.innerText?.trim(),
             comments,
         };
     });
