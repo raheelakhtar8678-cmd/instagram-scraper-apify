@@ -60,14 +60,25 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
     const usernameFromUrl = url.split('/').filter(Boolean).pop();
     log.info(`Scraping profile: ${url} (Username: ${usernameFromUrl})`);
 
-    // Give the page time to start loading
+    // Resilient Wait: Initially wait for the page to be meaningful
     await page.waitForTimeout(4000);
+
+    // Skeleton Detection: If body is empty or just loading, wait longer
+    const isSkeleton = await page.evaluate(() => {
+        const text = document.body.innerText.trim();
+        return text.length < 100 || text.toLowerCase().includes('loading');
+    });
+
+    if (isSkeleton) {
+        log.warning('Detected skeleton/loading page. Waiting an extra 8 seconds for hydration...');
+        await page.waitForTimeout(8000);
+    }
 
     // "Deep Scraping" - Scroll multiple times to trigger lazy loading
     log.info('Executing deep scroll for post discovery...');
     for (let i = 0; i < 6; i++) {
         await page.evaluate(() => window.scrollBy(0, 1500));
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(1200);
     }
 
     const data = await page.evaluate((usernameFallback) => {
@@ -155,19 +166,13 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
         };
     }, usernameFromUrl);
 
-    // Ultimate Fallback: Scrape from raw HTML if stats are still 0
+    // Ultimate Fallback for Stats: Scrape from raw HTML
     if (!data.followersCountRaw || data.followersCountRaw === '0') {
         const content = await page.content();
-        const followersMatch = content.match(/"edge_followed_by":\s*\{\s*"count":\s*(\d+)/);
-        const postsMatch = content.match(/"edge_owner_to_timeline_media":\s*\{\s*"count":\s*(\d+)/);
-        if (followersMatch) {
-            log.info('Found followers in raw HTML (Ultimate Fallback)');
-            data.followersCountRaw = followersMatch[1];
-        }
-        if (postsMatch) {
-            log.info('Found posts in raw HTML (Ultimate Fallback)');
-            data.postsCountRaw = postsMatch[1];
-        }
+        const followersMatch = content.match(/"edge_followed_by":\s*\{\s*"count":\s*(\d+)/) || content.match(/"followers_count":\s*(\d+)/);
+        const postsMatch = content.match(/"edge_owner_to_timeline_media":\s*\{\s*"count":\s*(\d+)/) || content.match(/"media_count":\s*(\d+)/);
+        if (followersMatch) data.followersCountRaw = followersMatch[1];
+        if (postsMatch) data.postsCountRaw = postsMatch[1];
     }
 
     // Normalize stats
@@ -188,16 +193,28 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
 
         const enqueuedCount = processedRequests?.length || 0;
 
-        // Brute force link discovery fallback
+        // BRUTE FORCE LINK HARVESTING (Layer 4)
         if (enqueuedCount === 0) {
-            log.warning('Standard enqueuing found 0 posts. Attempting brute-force link discovery...');
-            const manualLinks = await page.$$eval('a[href*="/p/"], a[href*="/reels/"]', (els) => els.map(a => a.href));
-            log.info(`Found ${manualLinks.length} posts via brute-force. Adding to queue...`);
-            if (manualLinks.length > 0) {
+            log.warning('Standard enqueuing found 0 posts. Harvesting links from raw HTML...');
+            const html = await page.content();
+            // Regex to find all /p/CODE/ or instagram.com/p/CODE/ links
+            const postPattern = /\/(?:p|reels)\/([\w_-]+)\//g;
+            const discoveredCodes = new Set();
+            let match;
+            while ((match = postPattern.exec(html)) !== null) {
+                discoveredCodes.add(match[1]);
+            }
+
+            const discoveredUrls = Array.from(discoveredCodes).map(code => `https://www.instagram.com/p/${code}/`);
+            log.info(`Harvested ${discoveredUrls.length} post URLs from raw HTML. Enqueuing...`);
+
+            if (discoveredUrls.length > 0) {
                 await enqueueLinks({
-                    urls: manualLinks.slice(0, 30),
+                    urls: discoveredUrls.slice(0, 30),
                     label: 'POST',
                 });
+            } else {
+                log.error('Even raw HTML harvesting found 0 posts. This profile likely requires login or is being blocked.');
             }
         } else {
             log.info(`Successfully enqueued ${enqueuedCount} posts.`);

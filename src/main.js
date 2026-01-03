@@ -27,9 +27,18 @@ const crawler = new PlaywrightCrawler({
     requestHandler: router,
     headless: true,
 
+    // Resilient Navigation
+    navigationTimeoutSecs: 60,
+    requestHandlerTimeoutSecs: 180,
+
     // Inject cookies if provided
     preNavigationHooks: [
-        async ({ page }) => {
+        async ({ page, request }) => {
+            // Set a generic User-Agent if not already set
+            await page.setExtraHTTPHeaders({
+                'Accept-Language': 'en-US,en;q=0.9',
+            });
+
             if (loginCookies && Array.isArray(loginCookies) && loginCookies.length > 0) {
                 const sanitizedCookies = loginCookies.map(cookie => {
                     const { sameSite, ...rest } = cookie;
