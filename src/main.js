@@ -119,8 +119,17 @@ console.log(`----------------------------------------------------------------`);
 if (enhanceReport) {
     // Only generate if we have at least one real item besides the SUMMARY
     if (itemCount > 1) {
-        await generateReport();
+        const reportHtml = await generateReport();
         console.log('✅ PREMIUM REPORT GENERATED!');
+
+        // Push the HTML to the dataset so the "Direct View" tab in Apify Console works
+        await Dataset.pushData({
+            type: 'SUMMARY',
+            REPORT_HTML: reportHtml,
+            VIEW_PREMIUM_REPORT: `https://api.apify.com/v2/key-value-stores/${process.env.APIFY_DEFAULT_KEY_VALUE_STORE_ID}/records/REPORT.html`,
+            scrapedAt: new Date().toISOString(),
+        });
+
         console.log(`🔗 View here: https://api.apify.com/v2/key-value-stores/${process.env.APIFY_DEFAULT_KEY_VALUE_STORE_ID}/records/REPORT.html`);
     } else {
         console.log('⚠️ No real profile data was scraped. Saving fallback dashboard.');
@@ -130,6 +139,13 @@ if (enhanceReport) {
             <p><strong>Tip:</strong> Try providing Login Cookies in the actor input.</p>
         </body></html>`;
         await Actor.setValue('REPORT', fallbackHtml, { contentType: 'text/html' });
+
+        await Dataset.pushData({
+            type: 'SUMMARY',
+            REPORT_HTML: fallbackHtml,
+            message: 'Dashboard Pending: No profile data scraped.',
+            scrapedAt: new Date().toISOString(),
+        });
     }
 }
 

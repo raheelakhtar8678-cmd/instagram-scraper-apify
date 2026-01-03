@@ -23,7 +23,8 @@ router.addDefaultHandler(async ({ page, log, request, enqueueLinks }) => {
         const h2s = Array.from(document.querySelectorAll('h2'));
         const bodyText = document.body.innerText.toLowerCase();
         return h2s.some(h => h.innerText.toLowerCase().includes('log in') || h.innerText.toLowerCase().includes('sign up')) ||
-            bodyText.includes('log in to see') || bodyText.includes('sign up to see');
+            bodyText.includes('log in to see') || bodyText.includes('sign up to see') ||
+            bodyText.includes('share everyday moments');
     });
 
     if (isLogin) {
@@ -76,8 +77,16 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
     });
 
     if (isSkeleton) {
-        log.warning('Detected skeleton page. Attempting refresh to force hydration...');
+        log.warning('Detected skeleton page or landing wall. Attempting refresh to force hydration...');
         await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => { });
+        await page.waitForTimeout(5000);
+    }
+
+    // Final check for the "Share everyday moments" block after initial load
+    const isLandingWall = await page.evaluate(() => document.body.innerText.toLowerCase().includes('share everyday moments'));
+    if (isLandingWall) {
+        log.warning('Detected "Share everyday moments" landing wall. This occurs when Instagram blocks the view. Attempting reload...');
+        await page.reload({ waitUntil: 'networkidle' }).catch(() => { });
         await page.waitForTimeout(5000);
     }
 

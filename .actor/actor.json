@@ -7,7 +7,6 @@
     "input": "./INPUT_SCHEMA.json",
     "storages": {
         "dataset": {
-            "actorSpecification": 1,
             "title": "Scraped Instagram Data",
             "views": {
                 "dashboard": {
@@ -25,7 +24,22 @@
                         ]
                     },
                     "display": {
-                        "component": "table"
+                        "component": "table",
+                        "properties": {
+                            "VIEW_PREMIUM_REPORT": {
+                                "title": "Dashboard",
+                                "format": "link"
+                            }
+                        }
+                    }
+                },
+                "report": {
+                    "title": "Direct View",
+                    "display": {
+                        "component": "html",
+                        "properties": {
+                            "htmlFieldName": "REPORT_HTML"
+                        }
                     }
                 }
             }

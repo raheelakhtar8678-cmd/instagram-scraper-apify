@@ -191,4 +191,5 @@ export async function generateReport() {
 
     await Actor.setValue('REPORT', html, { contentType: 'text/html' });
     console.log('Enhanced Premium Report saved to Key-Value Store as REPORT.html');
+    return html;
 }
