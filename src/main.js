@@ -85,7 +85,8 @@ for (const req of startUrls) {
 await crawler.run(requests);
 
 // Analytics & Report Summary
-const { itemCount } = await Dataset.getInfo();
+const dataset = await Dataset.open();
+const { itemCount } = await dataset.getInfo();
 console.log(`----------------------------------------------------------------`);
 console.log(`📊 FINAL SYNC COMPLETE: ${itemCount} items scraped.`);
 console.log(`----------------------------------------------------------------`);

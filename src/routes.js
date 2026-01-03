@@ -155,6 +155,21 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
         };
     }, usernameFromUrl);
 
+    // Ultimate Fallback: Scrape from raw HTML if stats are still 0
+    if (!data.followersCountRaw || data.followersCountRaw === '0') {
+        const content = await page.content();
+        const followersMatch = content.match(/"edge_followed_by":\s*\{\s*"count":\s*(\d+)/);
+        const postsMatch = content.match(/"edge_owner_to_timeline_media":\s*\{\s*"count":\s*(\d+)/);
+        if (followersMatch) {
+            log.info('Found followers in raw HTML (Ultimate Fallback)');
+            data.followersCountRaw = followersMatch[1];
+        }
+        if (postsMatch) {
+            log.info('Found posts in raw HTML (Ultimate Fallback)');
+            data.postsCountRaw = postsMatch[1];
+        }
+    }
+
     // Normalize stats
     data.followersCount = parseIGNumber(data.followersCountRaw);
     data.followingCount = parseIGNumber(data.followingCountRaw);
@@ -165,22 +180,27 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
     if (!data.isPrivate) {
         log.info('Enqueuing posts for deep scraping...');
         // Standard enqueuing
-        const { enqueued } = await enqueueLinks({
+        const { processedRequests } = await enqueueLinks({
             selector: 'a[href*="/p/"], a[href*="/reels/"]',
             label: 'POST',
             limit: 30,
         });
 
+        const enqueuedCount = processedRequests?.length || 0;
+
         // Brute force link discovery fallback
-        if (enqueued === 0) {
+        if (enqueuedCount === 0) {
             log.warning('Standard enqueuing found 0 posts. Attempting brute-force link discovery...');
             const manualLinks = await page.$$eval('a[href*="/p/"], a[href*="/reels/"]', (els) => els.map(a => a.href));
             log.info(`Found ${manualLinks.length} posts via brute-force. Adding to queue...`);
-            for (const link of manualLinks.slice(0, 30)) {
-                await Dataset.openRequestQueue().then(q => q.addRequest({ url: link, userData: { label: 'POST' } }));
+            if (manualLinks.length > 0) {
+                await enqueueLinks({
+                    urls: manualLinks.slice(0, 30),
+                    label: 'POST',
+                });
             }
         } else {
-            log.info(`Successfully enqueued ${enqueued} posts.`);
+            log.info(`Successfully enqueued ${enqueuedCount} posts.`);
         }
     }
 
