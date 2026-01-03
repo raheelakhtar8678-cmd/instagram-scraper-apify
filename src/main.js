@@ -130,13 +130,13 @@ if (enhanceReport) {
             scrapedAt: new Date().toISOString(),
         });
 
-        console.log(`🔗 View here: https://api.apify.com/v2/key-value-stores/${process.env.APIFY_DEFAULT_KEY_VALUE_STORE_ID}/records/REPORT.html`);
+        console.log(`🔗 PREMIUM REPORT READY! View here: https://api.apify.com/v2/key-value-stores/${process.env.APIFY_DEFAULT_KEY_VALUE_STORE_ID}/records/REPORT.html`);
     } else {
         console.log('⚠️ No real profile data was scraped. Saving fallback dashboard.');
-        const fallbackHtml = `<html><body style="font-family:sans-serif; padding:40px; text-align:center;">
-            <h1>Dashboard Pending</h1>
-            <p>No profile data has been scraped yet. If this run finished, it means the scraper was likely blocked by Instagram's login wall.</p>
-            <p><strong>Tip:</strong> Try providing Login Cookies in the actor input.</p>
+        const fallbackHtml = `<html><body style="font-family:sans-serif; padding:40px; text-align:center; background:#0f172a; color:#f8fafc;">
+            <h1 style="color:#FF3040;">Dashboard Pending</h1>
+            <p>No profile data has been scraped yet. This usually means the scraper was blocked or the list was empty.</p>
+            <p><strong>Tip:</strong> Check the logs for "Hit login wall" or "Landing wall". Use cookies if needed.</p>
         </body></html>`;
         await Actor.setValue('REPORT', fallbackHtml, { contentType: 'text/html' });
 

@@ -28,7 +28,7 @@
                         "component": "table",
                         "properties": {
                             "VIEW_PREMIUM_REPORT": {
-                                "title": "Dashboard",
+                                "title": "🔗 DASHBOARD LINK",
                                 "format": "link"
                             }
                         }

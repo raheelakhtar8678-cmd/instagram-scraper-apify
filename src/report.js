@@ -4,15 +4,18 @@ export async function generateReport() {
     console.log('Generating premium HTML report...');
     const dataset = await Actor.openDataset();
     const { items } = await dataset.getData();
+    console.log(`Generating report from ${items.length} dataset items...`);
 
     const stats = {
-        profiles: items.filter(i => i.type === 'profile').length,
-        posts: items.filter(i => i.type === 'post').length,
-        hashtags: items.filter(i => i.type === 'hashtag').length,
-        locations: items.filter(i => i.type === 'location').length,
-        totalFollowers: items.filter(i => i.type === 'profile').reduce((acc, p) => acc + (p.followersCount || 0), 0),
-        totalLikes: items.filter(i => i.type === 'post').reduce((acc, p) => acc + (p.likesCount || 0), 0)
+        profiles: items.filter(i => i.type?.toLowerCase() === 'profile').length,
+        posts: items.filter(i => i.type?.toLowerCase() === 'post').length,
+        hashtags: items.filter(i => i.type?.toLowerCase() === 'hashtag').length,
+        locations: items.filter(i => i.type?.toLowerCase() === 'location').length,
+        totalFollowers: items.filter(i => i.type?.toLowerCase() === 'profile').reduce((acc, p) => acc + (p.followersCount || 0), 0),
+        totalLikes: items.filter(i => i.type?.toLowerCase() === 'post').reduce((acc, p) => acc + (p.likesCount || 0), 0)
     };
+
+    console.log(`Stats calculated: Profiles=${stats.profiles}, Posts=${stats.posts}, Reach=${stats.totalFollowers}`);
 
     const html = `
 <!DOCTYPE html>
@@ -137,17 +140,18 @@ export async function generateReport() {
                         </tr>
                     </thead>
                     <tbody>
-                        ${items.filter(i => i.type !== 'SUMMARY').slice(0, 15).map(i => `
+                        ${items.filter(i => i.type && i.type !== 'SUMMARY').slice(0, 20).map(i => `
                             <tr>
                                 <td style="display:flex; align-items:center; gap:1rem;">
                                     ${i.profilePic ? `<img src="${i.profilePic}" class="profile-pic" onerror="this.src='https://via.placeholder.com/40'">` : ''}
-                                    <span>${i.username || i.tagName || i.locationName || (i.url ? i.url.split('/').pop() : 'N/A')}</span>
+                                    <span>${i.username || i.owner || i.tagName || i.locationName || (i.url ? i.url.split('/').pop() : 'N/A')}</span>
                                 </td>
                                 <td><span style="opacity:0.7">${i.type}</span></td>
                                 <td>${i.followersCount ? i.followersCount.toLocaleString() + ' followers' : (i.likesCount ? i.likesCount.toLocaleString() + ' likes' : '-')}</td>
                                 <td><span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">Scraped</span></td>
                             </tr>
                         `).join('')}
+                        ${items.length <= 1 ? '<tr><td colspan="4" style="text-align:center; padding:2rem; opacity:0.5;">No data items found yet. Check logs for blocks.</td></tr>' : ''}
                     </tbody>
                 </table>
             </div>
