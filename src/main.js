@@ -10,7 +10,8 @@ const {
     startUrls = [],
     search,
     proxy,
-    resultsLimit = 20,
+    maxPostsPerProfile = 15,
+    maxConcurrency = 2,
     searchLimit = 5,
     loginCookies,
     enhanceReport = true
@@ -23,7 +24,7 @@ const crawler = new PlaywrightCrawler({
     proxyConfiguration,
     useSessionPool: true,
     persistCookiesPerSession: true,
-    maxConcurrency: 1, // Be even more careful
+    maxConcurrency, // Honor user input
     requestHandler: router,
     headless: true,
 
@@ -44,7 +45,7 @@ const crawler = new PlaywrightCrawler({
 
     // Resilient Navigation
     navigationTimeoutSecs: 90,
-    requestHandlerTimeoutSecs: 240,
+    requestHandlerTimeoutSecs: 300,
 
     // Inject cookies if provided
     preNavigationHooks: [
@@ -73,8 +74,6 @@ const crawler = new PlaywrightCrawler({
     ],
 });
 
-
-
 // Prepare initial requests
 const requests = [];
 
@@ -82,7 +81,7 @@ const requests = [];
 if (search) {
     requests.push({
         url: `https://www.instagram.com/explore/tags/${search}/`,
-        userData: { label: 'HASHTAG', limit: searchLimit }
+        userData: { label: 'HASHTAG', limit: searchLimit, maxPosts: maxPostsPerProfile }
     });
 }
 
@@ -97,10 +96,11 @@ await Dataset.pushData({
 // Add start URLs and ensure they are clean
 for (const req of startUrls) {
     if (typeof req === 'string') {
-        requests.push({ url: req });
+        requests.push({ url: req, userData: { maxPosts: maxPostsPerProfile } });
     } else if (req && typeof req === 'object') {
         // Aggressively strip 'id' and other internal fields that Crawlee's addRequests might reject
         const { id, ...cleanReq } = req;
+        cleanReq.userData = { ...cleanReq.userData, maxPosts: maxPostsPerProfile };
         requests.push(cleanReq);
     }
 }

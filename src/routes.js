@@ -77,15 +77,19 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
 
     if (isSkeleton) {
         log.warning('Detected skeleton page. Attempting refresh to force hydration...');
-        await page.reload({ waitUntil: 'networkidle' }).catch(() => { });
-        await page.waitForTimeout(6000);
+        await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => { });
+        await page.waitForTimeout(5000);
     }
 
+    const { maxPosts = 15 } = request.userData;
+
     // "Deep Scraping" - Scroll multiple times to trigger lazy loading
-    log.info('Executing deep scroll for post discovery...');
-    for (let i = 0; i < 6; i++) {
+    // Optimize: Fewer scrolls if post limit is low
+    const scrollIterations = maxPosts <= 15 ? 3 : 6;
+    log.info(`Executing deep scroll for post discovery (${scrollIterations} iterations)...`);
+    for (let i = 0; i < scrollIterations; i++) {
         await page.evaluate(() => window.scrollBy(0, 1500));
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(800);
     }
 
     const data = await page.evaluate((usernameFallback) => {
@@ -197,18 +201,18 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
     }
 
     if (!data.isPrivate) {
-        log.info('Enqueuing posts for deep scraping...');
+        log.info(`Enqueuing up to ${maxPosts} posts for deep scraping...`);
         // Standard enqueuing
         const { processedRequests } = await enqueueLinks({
             selector: 'a[href*="/p/"], a[href*="/reels/"]',
             label: 'POST',
-            limit: 30,
+            limit: maxPosts,
         });
 
         const enqueuedCount = processedRequests?.length || 0;
 
         // BRUTE FORCE LINK HARVESTING (Layer 4)
-        if (enqueuedCount === 0) {
+        if (enqueuedCount === 0 && maxPosts > 0) {
             log.warning('Standard enqueuing found 0 posts. Harvesting links from raw HTML...');
             const html = await page.content();
             // Regex to find all /p/CODE/ or instagram.com/p/CODE/ links
@@ -224,7 +228,7 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
 
             if (discoveredUrls.length > 0) {
                 await enqueueLinks({
-                    urls: discoveredUrls.slice(0, 30),
+                    urls: discoveredUrls.slice(0, maxPosts),
                     label: 'POST',
                 });
             } else {
@@ -307,10 +311,12 @@ const handleHashtag = async ({ page, log, request, enqueueLinks }) => {
 
     tagInfo.postsCount = parseIGNumber(tagInfo.postsCountRaw);
 
+    const { maxPosts = 15 } = request.userData;
+
     await enqueueLinks({
         selector: 'a[href*="/p/"]',
         label: 'POST',
-        limit: 20,
+        limit: maxPosts,
     });
 
     await Dataset.pushData({
@@ -332,10 +338,12 @@ const handleLocation = async ({ page, log, request, enqueueLinks }) => {
         address: document.querySelector('header address')?.innerText,
     }));
 
+    const { maxPosts = 15 } = request.userData;
+
     await enqueueLinks({
         selector: 'a[href*="/p/"]',
         label: 'POST',
-        limit: 20,
+        limit: maxPosts,
     });
 
     await Dataset.pushData({
