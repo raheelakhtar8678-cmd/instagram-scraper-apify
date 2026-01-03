@@ -23,18 +23,34 @@ const crawler = new PlaywrightCrawler({
     proxyConfiguration,
     useSessionPool: true,
     persistCookiesPerSession: true,
-    maxConcurrency: 2, // Instagram is strict
+    maxConcurrency: 1, // Be even more careful
     requestHandler: router,
     headless: true,
 
+    // Mobile Safari Emulation
+    browserPoolOptions: {
+        useFingerprints: true,
+        fingerprintOptions: {
+            fingerprintGeneratorOptions: {
+                browsers: [
+                    { name: 'safari', minVersion: 15 },
+                    { name: 'chrome', minVersion: 100 },
+                ],
+                devices: ['mobile'],
+                operatingSystems: ['ios', 'android'],
+            },
+        },
+    },
+
     // Resilient Navigation
-    navigationTimeoutSecs: 60,
-    requestHandlerTimeoutSecs: 180,
+    navigationTimeoutSecs: 90,
+    requestHandlerTimeoutSecs: 240,
 
     // Inject cookies if provided
     preNavigationHooks: [
         async ({ page, request }) => {
-            // Set a generic User-Agent if not already set
+            // Mobile Device Emulation
+            await page.setViewportSize({ width: 390, height: 844 }); // iPhone 13
             await page.setExtraHTTPHeaders({
                 'Accept-Language': 'en-US,en;q=0.9',
             });

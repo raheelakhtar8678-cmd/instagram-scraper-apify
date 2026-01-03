@@ -1,4 +1,5 @@
 import { createPlaywrightRouter, Dataset } from 'crawlee';
+import { Actor } from 'apify';
 
 export const router = createPlaywrightRouter();
 
@@ -20,11 +21,16 @@ router.addDefaultHandler(async ({ page, log, request, enqueueLinks }) => {
     // Check for login wall or rate limiting (often shows up as a heading)
     const isLogin = await page.evaluate(() => {
         const h2s = Array.from(document.querySelectorAll('h2'));
-        return h2s.some(h => h.innerText.toLowerCase().includes('log in') || h.innerText.toLowerCase().includes('sign up'));
+        const bodyText = document.body.innerText.toLowerCase();
+        return h2s.some(h => h.innerText.toLowerCase().includes('log in') || h.innerText.toLowerCase().includes('sign up')) ||
+            bodyText.includes('log in to see') || bodyText.includes('sign up to see');
     });
 
     if (isLogin) {
         log.error('Hit login wall. This runner is being blocked. Cookies are highly recommended.');
+        // Save screenshot for login wall
+        const screenshotBuf = await page.screenshot().catch(() => null);
+        if (screenshotBuf) await Actor.setValue('LOGIN_WALL_SCREENSHOT', screenshotBuf, { contentType: 'image/png' });
         throw new Error('LOGIN_REQUIRED');
     }
 
@@ -40,8 +46,8 @@ router.addDefaultHandler(async ({ page, log, request, enqueueLinks }) => {
     }
 
     // Check for cookie consent
-    const cookieButton = await page.$('button:has-text("Allow all cookies"), button:has-text("Decline optional cookies")');
-    if (cookieButton) await cookieButton.click();
+    const cookieButton = await page.$('button:has-text("Allow all cookies"), button:has-text("Decline optional cookies"), button:has-text("Accept")');
+    if (cookieButton) await cookieButton.click().catch(() => { });
 
     // Route based on URL pattern
     if (request.url.includes('/p/') || request.url.includes('/reels/')) {
@@ -63,22 +69,23 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
     // Resilient Wait: Initially wait for the page to be meaningful
     await page.waitForTimeout(4000);
 
-    // Skeleton Detection: If body is empty or just loading, wait longer
+    // Skeleton Detection & Reload Strategy
     const isSkeleton = await page.evaluate(() => {
         const text = document.body.innerText.trim();
-        return text.length < 100 || text.toLowerCase().includes('loading');
+        return text.length < 200 || text.toLowerCase().includes('loading');
     });
 
     if (isSkeleton) {
-        log.warning('Detected skeleton/loading page. Waiting an extra 8 seconds for hydration...');
-        await page.waitForTimeout(8000);
+        log.warning('Detected skeleton page. Attempting refresh to force hydration...');
+        await page.reload({ waitUntil: 'networkidle' }).catch(() => { });
+        await page.waitForTimeout(6000);
     }
 
     // "Deep Scraping" - Scroll multiple times to trigger lazy loading
     log.info('Executing deep scroll for post discovery...');
     for (let i = 0; i < 6; i++) {
         await page.evaluate(() => window.scrollBy(0, 1500));
-        await page.waitForTimeout(1200);
+        await page.waitForTimeout(1000);
     }
 
     const data = await page.evaluate((usernameFallback) => {
@@ -182,6 +189,13 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
 
     log.info(`Extracted profile ${data.username}: ${data.followersCount} followers (Private: ${data.isPrivate})`);
 
+    // Diagnostic on failure
+    if (data.followersCount === 0 && !data.isPrivate) {
+        log.error('FAILED TO EXTRACT STATS on public profile. Saving diagnostic screenshot...');
+        const screenshotBuf = await page.screenshot({ fullPage: true }).catch(() => null);
+        if (screenshotBuf) await Actor.setValue('DIAGNOSTIC_SCREENSHOT', screenshotBuf, { contentType: 'image/png' });
+    }
+
     if (!data.isPrivate) {
         log.info('Enqueuing posts for deep scraping...');
         // Standard enqueuing
@@ -198,7 +212,7 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
             log.warning('Standard enqueuing found 0 posts. Harvesting links from raw HTML...');
             const html = await page.content();
             // Regex to find all /p/CODE/ or instagram.com/p/CODE/ links
-            const postPattern = /\/(?:p|reels)\/([\w_-]+)\//g;
+            const postPattern = /\/(?:p|reels|reels\/audio|stories)\/([\w_-]{5,15})\//g;
             const discoveredCodes = new Set();
             let match;
             while ((match = postPattern.exec(html)) !== null) {
@@ -206,7 +220,7 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
             }
 
             const discoveredUrls = Array.from(discoveredCodes).map(code => `https://www.instagram.com/p/${code}/`);
-            log.info(`Harvested ${discoveredUrls.length} post URLs from raw HTML. Enqueuing...`);
+            log.info(`Harvested ${discoveredUrls.length} post candidate URLs from raw HTML. Enqueuing...`);
 
             if (discoveredUrls.length > 0) {
                 await enqueueLinks({
@@ -214,7 +228,8 @@ const handleProfile = async ({ page, log, request, enqueueLinks }) => {
                     label: 'POST',
                 });
             } else {
-                log.error('Even raw HTML harvesting found 0 posts. This profile likely requires login or is being blocked.');
+                log.error('Even raw HTML harvesting found 0 posts. Saving raw dump for debugging...');
+                await Actor.setValue('RAW_HTML_DUMP', html, { contentType: 'text/html' });
             }
         } else {
             log.info(`Successfully enqueued ${enqueuedCount} posts.`);
