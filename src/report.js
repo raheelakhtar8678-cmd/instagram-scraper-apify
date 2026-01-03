@@ -114,16 +114,12 @@ export async function generateReport() {
                 <div class="stat-label">Posts</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value">${stats.hashtags}</div>
-                <div class="stat-label">Hashtags</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">${stats.locations}</div>
-                <div class="stat-label">Locations</div>
-            </div>
-            <div class="stat-card">
                 <div class="stat-value">${stats.totalFollowers.toLocaleString()}</div>
                 <div class="stat-label">Total Reach</div>
+            </div>
+             <div class="stat-card">
+                <div class="stat-value">${new Date().toLocaleTimeString()}</div>
+                <div class="stat-label">Last Updated</div>
             </div>
         </div>
 
@@ -140,25 +136,28 @@ export async function generateReport() {
                         </tr>
                     </thead>
                     <tbody>
-                        ${items.filter(i => i.type && i.type !== 'SUMMARY').slice(0, 20).map(i => {
-        const name = i.username || i.tagName || i.locationName || i.owner || (i.caption ? i.caption.substring(0, 20) + '...' : null) || (i.url ? i.url.split('/').pop() : 'N/A');
+                        ${items.filter(i => i.type && i.type?.toLowerCase() !== 'summary').slice(0, 30).map(i => {
+        const nameFallback = i.url ? i.url.split('/').filter(Boolean).pop() : 'Direct Link';
+        const name = i.username || i.tagName || i.locationName || i.owner || (i.caption ? i.caption.substring(0, 30) + '...' : null) || nameFallback;
         const metrics = i.followersCount ? i.followersCount.toLocaleString() + ' followers' : (i.likesCount ? i.likesCount.toLocaleString() + ' likes' : '-');
+        const img = i.profilePic || (i.images && i.images[0]) || 'https://via.placeholder.com/40';
+
         return `
                                 <tr>
                                     <td style="display:flex; align-items:center; gap:1rem;">
-                                        ${i.profilePic || (i.images && i.images[0]) ? `<img src="${i.profilePic || i.images[0]}" class="profile-pic" onerror="this.src='https://via.placeholder.com/40'">` : ''}
+                                        <img src="${img}" class="profile-pic" onerror="this.src='https://via.placeholder.com/40'">
                                         <div style="display:flex; flex-direction:column;">
-                                            <span style="font-weight:600;">${name}</span>
-                                            ${i.caption ? `<span style="font-size:0.7rem; opacity:0.6; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${i.caption}</span>` : ''}
+                                            <span style="font-weight:600; color:#fff;">${name}</span>
+                                            ${i.caption ? `<span style="font-size:0.7rem; opacity:0.6; max-width:250px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${i.caption}</span>` : ''}
                                         </div>
                                     </td>
-                                    <td><span style="opacity:0.7">${i.type}</span></td>
+                                    <td><span style="text-transform: capitalize; opacity:0.7">${i.type}</span></td>
                                     <td>${metrics}</td>
                                     <td><span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">Scraped</span></td>
                                 </tr>
                             `;
     }).join('')}
-                        ${items.length <= 1 ? '<tr><td colspan="4" style="text-align:center; padding:2rem; opacity:0.5;">No data items found yet. Check logs for blocks.</td></tr>' : ''}
+                        ${items.filter(i => i.type && i.type?.toLowerCase() !== 'summary').length === 0 ? '<tr><td colspan="4" style="text-align:center; padding:3rem; opacity:0.5;">No profiles or posts found. Instagram may have blocked the request.</td></tr>' : ''}
                     </tbody>
                 </table>
             </div>

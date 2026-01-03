@@ -133,6 +133,7 @@ if (enhanceReport) {
         console.log(`================================================================`);
         console.log(`🔗 PREMIUM REPORT READY!`);
         console.log(`👉 View Dashboard: https://api.apify.com/v2/key-value-stores/${process.env.APIFY_DEFAULT_KEY_VALUE_STORE_ID}/records/REPORT.html`);
+        console.log(`📝 Dataset ID: ${dataset.id}`);
         console.log(`================================================================`);
     } else {
         console.log('⚠️ No real profile data was scraped. Saving fallback dashboard.');
